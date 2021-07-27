@@ -84,9 +84,11 @@ class ChessBoard(object):
         if moves.count(xy_after) > 0:
             self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
             self.board[xy_before[1]][xy_before[0]] = ChessFigure(Colors.EMPTY)
+            return True
+        return False
 
-    def check_click(self, pos):
-        return self.board[pos[1]][pos[0]].color != Colors.EMPTY
+    def check_click(self, pos, figure_color):
+        return self.board[pos[1]][pos[0]].color == figure_color
 
     def draw_borders(self, screen_name, pos):
         self.board[pos[1]][pos[0]].clicked(screen_name, self.board, pos)
@@ -123,8 +125,14 @@ class Game(object):
     def start(self):
         self.draw_board()
         pygame.display.update()
+
         is_screen_clicked = False
         last_click = None
+
+        step = 1
+        moved = False
+        color = Colors.WHITE
+
         running = True
         while running:
             self.clock.tick(60)
@@ -134,7 +142,7 @@ class Game(object):
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1 and self.playing_board.check_click(
-                            (event.pos[0] // 80, event.pos[1] // 80)) and is_screen_clicked == False:
+                            (event.pos[0] // 80, event.pos[1] // 80), color) and is_screen_clicked == False:
                         self.draw_board()
                         self.playing_board.draw_borders(self.screen, (event.pos[0] // 80, event.pos[1] // 80))
                         pygame.display.update()
@@ -142,11 +150,14 @@ class Game(object):
                         last_click = event.pos
 
                     elif event.button == 1 and is_screen_clicked:
-                        self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
-                                     (event.pos[0] // 80, event.pos[1] // 80))
+                        if self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
+                                     (event.pos[0] // 80, event.pos[1] // 80)):
+                            step += 1
+                            color = Colors.WHITE if color == Colors.BLACK else Colors.BLACK
                         self.draw_board()
                         pygame.display.update()
                         is_screen_clicked = False
+
 
                     else:
                         self.draw_board()
