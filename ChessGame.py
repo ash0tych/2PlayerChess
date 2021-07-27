@@ -5,6 +5,8 @@ game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'Assets')
 BROWN = (124, 63, 12)
 YELLOW = (203, 191, 42)
+WIDTH = 640
+HEIGHT = 640
 
 
 class Colors(object):
@@ -15,20 +17,13 @@ class Colors(object):
 
 class ChessFigure(pygame.sprite.Sprite):
     def __init__(self, color):
+        pygame.sprite.Sprite.__init__(self)
         self.color = color
         self.image = None
         self.rect = None
 
 
-class EmptyFigure(ChessFigure):
-    def __str__(self):
-        return '. '
-
-
 class Pawn(ChessFigure):
-    def __str__(self):
-        return '♟' if self.color == Colors.BLACK else '♙'
-
     def get_moves(self, board, xy):
         moves = []
         if self.color == Colors.BLACK and xy[1] < 7:
@@ -68,10 +63,9 @@ class Pawn(ChessFigure):
             screen_name.blit(img, rect)
 
 
-
 class ChessBoard(object):
     def __init__(self):
-        self.board = [[EmptyFigure(Colors.EMPTY)] * 8 for _ in range(8)]
+        self.board = [[ChessFigure(Colors.EMPTY)] * 8 for _ in range(8)]
         self.board[1][0] = Pawn(Colors.BLACK)
         self.board[7][1] = Pawn(Colors.WHITE)
 
@@ -87,79 +81,76 @@ class ChessBoard(object):
 
     def move(self, xy_before, xy_after):
         moves = self.get_moves(xy_before)
-        print(moves)
         if moves.count(xy_after) > 0:
             self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
-            self.board[xy_before[1]][xy_before[0]] = EmptyFigure(Colors.EMPTY)
+            self.board[xy_before[1]][xy_before[0]] = ChessFigure(Colors.EMPTY)
 
-    def draw_all(self, screen_name):
+    def check_click(self, pos):
+        return self.board[pos[1]][pos[0]].color != Colors.EMPTY
+
+    def draw_borders(self, screen_name, pos):
+        self.board[pos[1]][pos[0]].clicked(screen_name, self.board, pos)
+
+
+class Game(object):
+    def __init__(self, screen = None):
+        pygame.init()
+        pygame.mixer.init()
+        self.playing_board = ChessBoard()
+        self.screen = screen if screen is not None else pygame.display.set_mode((WIDTH, HEIGHT))
+        self.clock = pygame.time.Clock()
+
+    def draw_board(self):
         for i in range(8):
             for j in range(8):
-                if  (i + j) % 2 == 0 :
+                if (i + j) % 2 == 0:
                     image = pygame.Surface((80, 80))
                     image.fill(YELLOW)
                     rect = image.get_rect()
                     rect.topleft = (i * 80, j * 80)
-                    screen_name.blit(image, rect)
+                    self.screen.blit(image, rect)
 
                 else:
                     image = pygame.Surface((80, 80))
                     image.fill(BROWN)
                     rect = image.get_rect()
                     rect.topleft = (i * 80, j * 80)
-                    screen_name.blit(image, rect)
+                    self.screen.blit(image, rect)
 
-                if type(self.board[i][j]) != EmptyFigure:
-                    self.board[i][j].draw(screen_name, (i, j))
+                if self.playing_board.board[i][j].color != Colors.EMPTY:
+                    self.playing_board.board[i][j].draw(self.screen, (i, j))
 
-    def check_click(self, pos):
-        return type(self.board[pos[1]][pos[0]]) != EmptyFigure
+    def start(self):
+        self.draw_board()
+        pygame.display.update()
+        is_screen_clicked = False
+        last_click = None
+        running = True
+        while running:
+            self.clock.tick(60)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
 
-    def draw_borders(self, screen_name, pos):
-            self.board[pos[1]][pos[0]].clicked(screen_name, self.board, pos)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1 and self.playing_board.check_click(
+                            (event.pos[0] // 80, event.pos[1] // 80)) and is_screen_clicked == False:
+                        self.draw_board()
+                        self.playing_board.draw_borders(self.screen, (event.pos[0] // 80, event.pos[1] // 80))
+                        pygame.display.update()
+                        is_screen_clicked = True
+                        last_click = event.pos
 
+                    elif event.button == 1 and is_screen_clicked:
+                        self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
+                                     (event.pos[0] // 80, event.pos[1] // 80))
+                        self.draw_board()
+                        pygame.display.update()
+                        is_screen_clicked = False
 
-c_board = ChessBoard()
-pygame.init()
-pygame.mixer.init()
-screen = pygame.display.set_mode((640, 640))
-clock = pygame.time.Clock()
+                    else:
+                        self.draw_board()
+                        pygame.display.update()
+        pygame.quit()
 
-screen.fill((255, 255, 255))
-c_board.draw_all(screen)
-pygame.display.update()
-
-is_screen_clicked = False
-last_click = None
-
-# Цикл игры
-running = True
-while running:
-    # Держим цикл на правильной скорости
-    clock.tick(60)
-    # Ввод процесса (события)
-    for event in pygame.event.get():
-        # check for closing window
-        if event.type == pygame.QUIT:
-            running = False
-
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1 and c_board.check_click((event.pos[0] // 80, event.pos[1] // 80)) and is_screen_clicked == False:
-                c_board.draw_all(screen)
-                c_board.draw_borders(screen, (event.pos[0] // 80, event.pos[1] // 80))
-                pygame.display.update()
-                is_screen_clicked = True
-                last_click = event.pos
-
-            elif event.button == 1 and is_screen_clicked:
-                c_board.move((last_click[0] // 80, last_click[1] // 80), (event.pos[0] // 80, event.pos[1] // 80))
-                c_board.draw_all(screen)
-                pygame.display.update()
-                is_screen_clicked = False
-
-            else:
-                screen.fill((255, 255, 255))
-                c_board.draw_all(screen)
-                pygame.display.update()
-
-pygame.quit()
+Game().start()
