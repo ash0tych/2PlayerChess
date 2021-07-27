@@ -7,6 +7,7 @@ BROWN = (124, 63, 12)
 YELLOW = (203, 191, 42)
 WIDTH = 640
 HEIGHT = 640
+X_AXIS = {0 : 'a',}
 
 
 class Colors(object):
@@ -20,8 +21,6 @@ class ChessFigure(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.color = color
         self.image = None
-        self.rect = None
-
 
 class Pawn(ChessFigure):
     def get_moves(self, board, xy):
@@ -50,31 +49,21 @@ class Pawn(ChessFigure):
             else:
                 self.image = pygame.image.load(os.path.join(img_folder, 'wP.png'))
 
-        self.rect = self.image.get_rect()
-        self.rect.topleft = (xy[1] * 80, xy[0] * 80)
-        screen_name.blit(self.image, self.rect)
+        print(xy[1],xy[0])
+        screen_name.blit(self.image, (xy[1] * 80, xy[0] * 80))
 
     def clicked(self, screen_name, board, xy):
         moves = self.get_moves(board, (xy[0], xy[1]))
         for pos in moves:
             img = pygame.image.load(os.path.join(img_folder, 'border.png'))
-            rect = img.get_rect()
-            rect.topleft = (pos[0] * 80, pos[1] * 80)
-            screen_name.blit(img, rect)
+            screen_name.blit(img, (pos[0] * 80, pos[1] * 80))
 
 
 class ChessBoard(object):
     def __init__(self):
         self.board = [[ChessFigure(Colors.EMPTY)] * 8 for _ in range(8)]
         self.board[1][0] = Pawn(Colors.BLACK)
-        self.board[7][1] = Pawn(Colors.WHITE)
-
-    def __str__(self):
-        result = '  a b c d e f g h\n'
-
-        for i in range(8):
-            result += '{} '.format(8 - i) + ''.join(map(str, self.board[i])) + '\n'
-        return result
+        self.board[6][2] = Pawn(Colors.WHITE)
 
     def get_moves(self, xy):
         return self.board[xy[1]][xy[0]].get_moves(self.board, xy)
@@ -93,6 +82,14 @@ class ChessBoard(object):
     def draw_borders(self, screen_name, pos):
         self.board[pos[1]][pos[0]].clicked(screen_name, self.board, pos)
 
+    def get_color_items(self, color_name):
+        result = []
+        for i in range(8):
+            for j in range(8):
+                if self.board[i][j].color == color_name:
+                    result.append((i, j))
+        return result
+
 
 class Game(object):
     def __init__(self, screen = None):
@@ -108,29 +105,29 @@ class Game(object):
                 if (i + j) % 2 == 0:
                     image = pygame.Surface((80, 80))
                     image.fill(YELLOW)
-                    rect = image.get_rect()
-                    rect.topleft = (i * 80, j * 80)
-                    self.screen.blit(image, rect)
+                    self.screen.blit(image, (i * 80, j * 80))
 
                 else:
                     image = pygame.Surface((80, 80))
                     image.fill(BROWN)
-                    rect = image.get_rect()
-                    rect.topleft = (i * 80, j * 80)
-                    self.screen.blit(image, rect)
+                    self.screen.blit(image, (i * 80, j * 80))
 
-                if self.playing_board.board[i][j].color != Colors.EMPTY:
-                    self.playing_board.board[i][j].draw(self.screen, (i, j))
+    def draw_figures(self):
+        black = self.playing_board.get_color_items(Colors.BLACK)
+        white = self.playing_board.get_color_items(Colors.WHITE)
+        for item in (black + white):
+            self.playing_board.board[item[0]][item[1]].draw(self.screen, item)
+
 
     def start(self):
         self.draw_board()
+        self.draw_figures()
         pygame.display.update()
 
         is_screen_clicked = False
         last_click = None
 
         step = 1
-        moved = False
         color = Colors.WHITE
 
         running = True
@@ -144,6 +141,7 @@ class Game(object):
                     if event.button == 1 and self.playing_board.check_click(
                             (event.pos[0] // 80, event.pos[1] // 80), color) and is_screen_clicked == False:
                         self.draw_board()
+                        self.draw_figures()
                         self.playing_board.draw_borders(self.screen, (event.pos[0] // 80, event.pos[1] // 80))
                         pygame.display.update()
                         is_screen_clicked = True
@@ -155,12 +153,13 @@ class Game(object):
                             step += 1
                             color = Colors.WHITE if color == Colors.BLACK else Colors.BLACK
                         self.draw_board()
+                        self.draw_figures()
                         pygame.display.update()
                         is_screen_clicked = False
 
-
                     else:
                         self.draw_board()
+                        self.draw_figures()
                         pygame.display.update()
         pygame.quit()
 
