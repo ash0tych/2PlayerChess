@@ -62,9 +62,9 @@ class Pawn(ChessFigure):
                 moves.append((xy[0], xy[1] - 1))
             if self.first_move and board[xy[1] - 1][xy[0]].color == board[xy[1] - 2][xy[0]].color == Colors.EMPTY:
                 moves.append((xy[0], xy[1] - 2))
-            if xy[0] < 7 and board[xy[1] - 1][xy[0] - 1].color == Colors.BLACK:
+            if xy[0] > 0 and board[xy[1] - 1][xy[0] - 1].color == Colors.BLACK:
                 moves.append((xy[0] - 1, xy[1] - 1))
-            if xy[0] > 0 and board[xy[1] - 1][xy[0] + 1].color == Colors.BLACK:
+            if xy[0] < 7 and board[xy[1] - 1][xy[0] + 1].color == Colors.BLACK:
                 moves.append((xy[0] + 1, xy[1] - 1))
         return moves
 
@@ -298,22 +298,67 @@ class Queen(ChessFigure):
             screen_name.blit(img, (pos[0] * 80, pos[1] * 80))
 
 
+class Knight(ChessFigure):
+    def __init__(self, color):
+        ChessFigure.__init__(self, color)
+        if self.color == Colors.BLACK:
+            self.image = pygame.image.load(os.path.join(img_folder, 'bN.png'))
+        else:
+            self.image = pygame.image.load(os.path.join(img_folder, 'wN.png'))
+
+    def get_moves(self, board, xy):
+        moves = []
+        i, j = xy[1], xy[0]
+        if 0 <= i + 2 <= 7 and 0 <= j + 1 <= 7 and board[i + 2][j + 1].color != self.color:
+            moves.append((j + 1, i + 2))
+
+        if 0 <= i + 2 <= 7 and 0 <= j - 1 <= 7 and board[i + 2][j - 1].color != self.color:
+            moves.append((j - 1, i + 2))
+
+        if 0 <= i - 2 <= 7 and 0 <= j + 1 <= 7 and board[i - 2][j + 1].color != self.color:
+            moves.append((j + 1, i - 2))
+
+        if 0 <= i - 2 <= 7 and 0 <= j - 1 <= 7 and board[i - 2][j - 1].color != self.color:
+            moves.append((j - 1, i - 2))
+
+        if 0 <= i + 1 <= 7 and 0 <= j + 2 <= 7 and board[i + 1][j + 2].color != self.color:
+            moves.append((j + 2, i + 1))
+
+        if 0 <= i - 1 < 7 and 0 <= j + 2 <= 7 and board[i - 1][j + 2].color != self.color:
+            moves.append((j + 2, i - 1))
+
+        if 0 <= i + 1 <= 7 and 0 <= j - 2 <= 7 and board[i + 1][j - 2].color != self.color:
+            moves.append((j - 2, i + 1))
+
+        if 0 <= i - 1 < 7 and 0 <= j - 2 <= 7 and board[i - 1][j - 2].color != self.color:
+            moves.append((j - 2, i - 1))
+
+        return moves
+
+    def clicked(self, screen_name, board, xy):
+        moves = self.get_moves(board, (xy[0], xy[1]))
+        for pos in moves:
+            img = pygame.image.load(os.path.join(img_folder, 'border.png'))
+            screen_name.blit(img, (pos[0] * 80, pos[1] * 80))
+
+
 class ChessBoard(object):
     def __init__(self):
         self.board = [[ChessFigure(Colors.EMPTY)] * 8 for _ in range(8)]
-        self.board[1][0] = Pawn(Colors.BLACK)
-        self.board[1][1] = Rook(Colors.WHITE)
-        self.board[1][2] = Pawn(Colors.BLACK)
-        self.board[1][3] = Bishop(Colors.BLACK)
-        self.board[1][4] = Pawn(Colors.BLACK)
-        self.board[1][5] = Queen(Colors.BLACK)
+        for i in range(8):
+            self.board[1][i] = Pawn(Colors.BLACK)
+        self.board[0][0] = self.board[0][7] = Rook(Colors.BLACK)
+        self.board[0][2] = self.board[0][5] = Bishop(Colors.BLACK)
+        self.board[0][3] = Queen(Colors.BLACK)
+        self.board[0][1] = self.board[0][6] = Knight(Colors.BLACK)
 
-        self.board[5][2] = Rook(Colors.BLACK)
-        self.board[6][3] = Pawn(Colors.WHITE)
-        self.board[6][4] = Bishop(Colors.WHITE)
-        self.board[6][5] = Pawn(Colors.WHITE)
-        self.board[6][6] = Queen(Colors.WHITE)
-        self.board[6][7] = Pawn(Colors.WHITE)
+        for i in range(8):
+            self.board[6][i] = Pawn(Colors.WHITE)
+        self.board[7][0] = self.board[7][7] = Rook(Colors.WHITE)
+        self.board[7][2] = self.board[7][5] = Bishop(Colors.WHITE)
+        self.board[7][3] = Queen(Colors.WHITE)
+        self.board[7][1] = self.board[7][6] = Knight(Colors.WHITE)
+
 
     def get_moves(self, xy):
         return self.board[xy[1]][xy[0]].get_moves(self.board, xy)
@@ -371,9 +416,7 @@ class Game(object):
             self.playing_board.board[item[0]][item[1]].draw(self.screen, item)
 
     def start(self):
-        self.draw_board()
-        self.draw_figures()
-        pygame.display.update()
+        self.draw()
 
         is_screen_clicked = False
         last_click = None
@@ -391,38 +434,36 @@ class Game(object):
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1 and self.playing_board.check_click(
                             (event.pos[0] // 80, event.pos[1] // 80), color) and not is_screen_clicked:
-                        self.draw_board()
-                        self.draw_figures()
-                        self.playing_board.draw_borders(self.screen, (event.pos[0] // 80, event.pos[1] // 80))
-                        pygame.display.update()
+                        self.draw(event.pos)
                         is_screen_clicked = True
                         last_click = event.pos
 
                     elif event.button == 1 and is_screen_clicked:
                         if self.playing_board.check_click((event.pos[0] // 80, event.pos[1] // 80), color):
-                            self.draw_board()
-                            self.draw_figures()
-                            self.playing_board.draw_borders(self.screen, (event.pos[0] // 80, event.pos[1] // 80))
-                            pygame.display.update()
+                            self.draw(event.pos)
                             last_click = event.pos
 
                         elif self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
                                                      (event.pos[0] // 80, event.pos[1] // 80)):
                             step += 1
                             color = Colors.WHITE if color == Colors.BLACK else Colors.BLACK
-                            self.draw_board()
-                            self.draw_figures()
-                            pygame.display.update()
+                            self.draw()
                             is_screen_clicked = False
 
                     else:
-                        self.draw_board()
-                        self.draw_figures()
-                        pygame.display.update()
+                        self.draw()
+
         pygame.quit()
 
     def move(self, string_before, string_after):
         self.playing_board.move(chess_xy(string_before), chess_xy(string_after))
+
+    def draw(self, event=None):
+        self.draw_board()
+        self.draw_figures()
+        if event is not None:
+            self.playing_board.draw_borders(self.screen, (event[0] // 80, event[1] // 80))
+        pygame.display.update()
 
 
 Game().start()
