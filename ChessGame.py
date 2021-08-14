@@ -253,6 +253,8 @@ class ChessBoard(object):
         self.board = [[ChessFigure('none', (-1, -1))] * 8 for _ in range(8)]
         self.black_king = (-1, -1)
         self.white_king = (-1, -1)
+        self.step = 0
+        self.current_color = 'w'
 
     def figure_init(self):
         for i in range(8):
@@ -279,12 +281,16 @@ class ChessBoard(object):
         self.board[7][4] = King('w', (4, 7))
         self.white_king = (4, 7)
 
+    def new_game(self):
+        self.step = 1
+        self.current_color = 'w'
+
     def get_moves(self, xy):
         if type(self.board[xy[1]][xy[0]]) is not King:
             return self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
         else:
             king_moves = set(self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)).difference(
-                self.get_color_steps('w' if self.board[xy[1]][xy[0]].color == 'b' else 'b'))
+                self.get_color_steps('w' if self.board[xy[1]][xy[0]].color == 'b' else 'b', True))
         return list(king_moves)
 
     def move(self, xy_before, xy_after):
@@ -300,18 +306,29 @@ class ChessBoard(object):
                     self.white_king = xy_after
             self.board[xy_after[1]][xy_after[0]].xy = (xy_after[1], xy_after[0])
             self.board[xy_before[1]][xy_before[0]] = ChessFigure('none', (-1, -1))
+
+            self.step += 1
+            self.current_color = 'w' if self.current_color == 'b' else 'b'
+
             return True
         return False
 
     def check_click(self, pos, figure_color):
         return False if pos[0] >= 8 else self.board[pos[1]][pos[0]].color == figure_color
 
-    def draw_borders(self, screen_name, pos):
-        moves = self.get_moves(pos)
-        img = pygame.image.load(os.path.join(img_folder, 'border.png'))
-        screen_name.blit(img, (pos[0] * 80, pos[1] * 80))
-        for pos_moves in moves:
-            screen_name.blit(img, (pos_moves[0] * 80, pos_moves[1] * 80))
+    def is_king_check(self, color):
+        enemy_color = 'b' if color == 'w' else 'w'
+        pos = self.get_king_pos(color)
+        enemy_steps = self.get_color_steps(enemy_color)
+        if pos in set(enemy_steps):
+            return True
+
+        return False
+
+    def get_king_pos(self, color):
+        if color == 'w':
+            return self.white_king
+        return self.black_king
 
     def get_color_items(self, color_name):
         result = []
@@ -321,10 +338,14 @@ class ChessBoard(object):
                     result.append((i, j))
         return result
 
-    def get_color_steps(self, color_name):
+    def get_color_steps(self, color_name, covering=False):
         moves = set()
         colored_items = self.get_color_items(color_name)
-        reverse_color = 'b' if color_name == 'w' else 'w'
+        if covering:
+            reverse_color = 'b' if color_name == 'w' else 'w'
+        else:
+            reverse_color = color_name
+
         for item in colored_items:
             if type(self.board[item[0]][item[1]]) == Pawn:
                 buf_set = set(self.board[item[0]][item[1]].get_possible_pawn_diag_moves())
@@ -333,6 +354,10 @@ class ChessBoard(object):
             moves.update(buf_set)
 
         return moves
+
+    def get_current_color(self):
+        return self.current_color
+
 
 
 class Game(object):
@@ -368,9 +393,6 @@ class Game(object):
         is_screen_clicked = False
         last_click = None
 
-        step = 1
-        color = 'w'
-
         running = True
         while running:
             self.clock.tick(60)
@@ -380,22 +402,23 @@ class Game(object):
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1 and self.playing_board.check_click(
-                            (event.pos[0] // 80, event.pos[1] // 80), color) and not is_screen_clicked:
+                            (event.pos[0] // 80, event.pos[1] // 80), self.playing_board.get_current_color()) and not is_screen_clicked:
                         self.draw(event.pos)
                         is_screen_clicked = True
                         last_click = event.pos
 
                     elif event.button == 1 and is_screen_clicked:
-                        if self.playing_board.check_click((event.pos[0] // 80, event.pos[1] // 80), color):
+                        if self.playing_board.check_click((event.pos[0] // 80, event.pos[1] // 80), self.playing_board.get_current_color()):
                             self.draw(event.pos)
                             last_click = event.pos
 
                         elif self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
                                                      (event.pos[0] // 80, event.pos[1] // 80)):
-                            step += 1
-                            color = 'w' if color == 'b' else 'b'
                             self.draw()
                             is_screen_clicked = False
+
+                        else:
+                            self.draw()
 
                     else:
                         self.draw()
@@ -409,8 +432,21 @@ class Game(object):
         self.draw_board()
         self.draw_figures()
         if event is not None:
-            self.playing_board.draw_borders(self.screen, (event[0] // 80, event[1] // 80))
+            self.draw_borders((event[0] // 80, event[1] // 80))
+
+        if self.playing_board.is_king_check(self.playing_board.get_current_color()):
+            pos = self.playing_board.get_king_pos(self.playing_board.get_current_color())
+            img = pygame.image.load(os.path.join(img_folder, 'check_border.png'))
+            self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
+
         pygame.display.update()
+
+    def draw_borders(self, pos):
+        moves = self.playing_board.get_moves(pos)
+        img = pygame.image.load(os.path.join(img_folder, 'border.png'))
+        self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
+        for pos_moves in moves:
+            self.screen.blit(img, (pos_moves[0] * 80, pos_moves[1] * 80))
 
 
 Game().start()
