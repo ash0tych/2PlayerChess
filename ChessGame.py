@@ -1,5 +1,6 @@
 import pygame
 import os
+import copy
 
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'Assets')
@@ -26,86 +27,86 @@ class ChessFigure(pygame.sprite.Sprite):
         screen_name.blit(self.image, (self.xy[1] * 80, self.xy[0] * 80))
 
     def get_vertical_move(self, board, color):
-        moves = []
+        moves = set()
         i, j = self.xy
         while i > 0 and board[i - 1][j].color == 'none':
             i -= 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 0 and board[i - 1][j].color != color:
-            moves.append((j, i - 1))
+            moves.add((j, i - 1))
 
         i, j = self.xy
         while i < 7 and board[i + 1][j].color == 'none':
             i += 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 7 and board[i + 1][j].color != color:
-            moves.append((j, i + 1))
+            moves.add((j, i + 1))
 
         return moves
 
     def get_horizontal_move(self, board, color):
-        moves = []
+        moves = set()
         i, j = self.xy
         while j > 0 and board[i][j - 1].color == 'none':
             j -= 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if j != 0 and board[i][j - 1].color != color:
-            moves.append((j - 1, i))
+            moves.add((j - 1, i))
 
         i, j = self.xy
         while j < 7 and board[i][j + 1].color == 'none':
             j += 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if j != 7 and board[i][j + 1].color != color:
-            moves.append((j + 1, i))
+            moves.add((j + 1, i))
 
         return moves
 
     def get_main_diag(self, board, color):
-        moves = []
+        moves = set()
         i, j = self.xy
         while i > 0 and j > 0 and board[i - 1][j - 1].color == 'none':
             i -= 1
             j -= 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 0 and j != 0 and board[i - 1][j - 1].color != color:
-            moves.append((j - 1, i - 1))
+            moves.add((j - 1, i - 1))
 
         i, j = self.xy
         while i < 7 and j < 7 and board[i + 1][j + 1].color == 'none':
             i += 1
             j += 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 7 and j != 7 and board[i + 1][j + 1].color != color:
-            moves.append((j + 1, i + 1))
+            moves.add((j + 1, i + 1))
 
         return moves
 
     def get_side_diag(self, board, color):
-        moves = []
+        moves = set()
         i, j = self.xy
         while i > 0 and j < 7 and board[i - 1][j + 1].color == 'none':
             i -= 1
             j += 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 0 and j != 7 and board[i - 1][j + 1].color != color:
-            moves.append((j + 1, i - 1))
+            moves.add((j + 1, i - 1))
 
         i, j = self.xy
         while i < 7 and j > 0 and board[i + 1][j - 1].color == 'none':
             i += 1
             j -= 1
-            moves.append((j, i))
+            moves.add((j, i))
 
         if i != 7 and j != 0 and board[i + 1][j - 1].color != color:
-            moves.append((j - 1, i + 1))
+            moves.add((j - 1, i + 1))
 
         return moves
 
@@ -119,46 +120,46 @@ class Pawn(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wP.png'))
 
     def get_moves(self, board, color):
-        return self.get_pawn_straight_moves(board, color) + self.get_pawn_diag_moves(board, color)
+        return set.union(self.get_pawn_straight_moves(board, color), self.get_pawn_diag_moves(board, color))
 
     def get_pawn_straight_moves(self, board, color):
-        moves = []
+        moves = set()
         k = 1 if color == 'b' else -1
         buf_xy = (self.xy[1], self.xy[0])
 
         if buf_xy[1] < 7:
             if board[buf_xy[1] + k][buf_xy[0]].color == 'none':
-                moves.append((buf_xy[0], buf_xy[1] + k))
+                moves.add((buf_xy[0], buf_xy[1] + k))
 
             if self.first_move and board[buf_xy[1] + k][buf_xy[0]].color == \
                     board[buf_xy[1] + 2 * k][buf_xy[0]].color == 'none':
-                moves.append((buf_xy[0], buf_xy[1] + 2 * k))
+                moves.add((buf_xy[0], buf_xy[1] + 2 * k))
         return moves
 
     def get_pawn_diag_moves(self, board, color):
-        moves = []
+        moves = set()
         col = 'w' if color == 'b' else 'b'
         k = 1 if self.color == 'b' else -1
         buf_xy = (self.xy[1], self.xy[0])
 
         if buf_xy[1] < 7:
             if buf_xy[0] < 7 and board[buf_xy[1] + k][buf_xy[0] + 1].color == col:
-                moves.append((buf_xy[0] + 1, buf_xy[1] + k))
+                moves.add((buf_xy[0] + 1, buf_xy[1] + k))
 
             if buf_xy[0] > 0 and board[buf_xy[1] + k][buf_xy[0] - 1].color == col:
-                moves.append((buf_xy[0] - 1, buf_xy[1] + k))
+                moves.add((buf_xy[0] - 1, buf_xy[1] + k))
 
         return moves
 
     def get_possible_pawn_diag_moves(self):
-        moves = []
+        moves = set()
         k = 1 if self.color == 'b' else -1
         buf_xy = (self.xy[1], self.xy[0])
         if buf_xy[1] < 7:
             if buf_xy[0] < 7:
-                moves.append((buf_xy[0] + 1, buf_xy[1] + k))
+                moves.add((buf_xy[0] + 1, buf_xy[1] + k))
             if buf_xy[0] > 0:
-                moves.append((buf_xy[0] - 1, buf_xy[1] + k))
+                moves.add((buf_xy[0] - 1, buf_xy[1] + k))
 
         return moves
 
@@ -172,7 +173,7 @@ class Rook(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wR.png'))
 
     def get_moves(self, board, color):
-        return self.get_vertical_move(board, color) + self.get_horizontal_move(board, color)
+        return set.union(self.get_vertical_move(board, color), self.get_horizontal_move(board, color))
 
 
 class Bishop(ChessFigure):
@@ -184,7 +185,7 @@ class Bishop(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wB.png'))
 
     def get_moves(self, board, color):
-        return self.get_main_diag(board, color) + self.get_side_diag(board, color)
+        return set.union(self.get_main_diag(board, color), self.get_side_diag(board, color))
 
 
 class Queen(ChessFigure):
@@ -196,8 +197,8 @@ class Queen(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wQ.png'))
 
     def get_moves(self, board, color):
-        return (self.get_main_diag(board, color) + self.get_side_diag(board, color) +
-                self.get_horizontal_move(board, color) + self.get_vertical_move(board, color))
+        return set.union(self.get_main_diag(board, color), self.get_side_diag(board, color),
+                         self.get_horizontal_move(board, color), self.get_vertical_move(board, color))
 
 
 class Knight(ChessFigure):
@@ -209,25 +210,24 @@ class Knight(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wN.png'))
 
     def get_one_step(self, board, direction, color):
-        moves = []
+        moves = set()
         i, j = self.xy
         if 0 <= i + direction[0] <= 7 and 0 <= j + direction[1] <= 7 and \
                 board[i + direction[0]][j + direction[1]].color != color:
-            moves.append((j + direction[1], i + direction[0]))
+            moves.add((j + direction[1], i + direction[0]))
 
         if 0 <= i + direction[0] <= 7 and 0 <= j - direction[1] <= 7 and \
                 board[i + direction[0]][j - direction[1]].color != color:
-            moves.append((j - direction[1], i + direction[0]))
+            moves.add((j - direction[1], i + direction[0]))
 
         return moves
 
     def get_moves(self, board, color):
-        moves = []
-        moves += self.get_one_step(board, (2, 1), color)
-        moves += self.get_one_step(board, (-2, 1), color)
-        moves += self.get_one_step(board, (1, 2), color)
-        moves += self.get_one_step(board, (-1, 2), color)
-
+        moves = set()
+        moves = set.union(self.get_one_step(board, (2, 1), color), moves)
+        moves = set.union(self.get_one_step(board, (-2, 1), color), moves)
+        moves = set.union(self.get_one_step(board, (1, 2), color), moves)
+        moves = set.union(self.get_one_step(board, (-1, 2), color), moves)
         return moves
 
 
@@ -240,11 +240,11 @@ class King(ChessFigure):
             self.image = pygame.image.load(os.path.join(img_folder, 'wK.png'))
 
     def get_moves(self, board, color):
-        moves = []
+        moves = set()
         for i in range(self.xy[0] - 1, self.xy[0] + 2):
             for j in range(self.xy[1] - 1, self.xy[1] + 2):
                 if 0 <= i <= 7 and 0 <= j <= 7 and board[i][j].color != color:
-                    moves.append((j, i))
+                    moves.add((j, i))
         return moves
 
 
@@ -287,37 +287,79 @@ class ChessBoard(object):
 
     def get_moves(self, xy):
         if type(self.board[xy[1]][xy[0]]) is not King:
-            return self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
+            moves_before_deleting = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
+
         else:
-            king_moves = set(self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)).difference(
+            moves_before_deleting = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color).difference(
                 self.get_color_steps('w' if self.board[xy[1]][xy[0]].color == 'b' else 'b', True))
-        return list(king_moves)
+
+        moves = self.delete_unreal_moves(moves_before_deleting, xy)
+        return moves
+
+    def check_move(self, xy_before, xy_after):
+        return xy_after in set(self.get_moves(xy_before))
+
+    def delete_unreal_moves(self, moves, xy):
+        moves_after_deleting = set()
+        for move in moves:
+            deleted_figure = self.pseudo_move(xy, move)
+            if not self.is_king_check(self.current_color):
+                moves_after_deleting.add(move)
+            self.pseudo_move_back(xy, move, deleted_figure)
+
+        return moves_after_deleting
+
 
     def move(self, xy_before, xy_after):
-        moves = self.get_moves(xy_before)
-        if moves.count(xy_after) > 0:
-            if type(self.board[xy_before[1]][xy_before[0]]) == Pawn:
-                self.board[xy_before[1]][xy_before[0]].first_move = False
-            self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
-            if type(self.board[xy_after[1]][xy_after[0]]) == King:
-                if self.board[xy_after[1]][xy_after[0]].color == 'b':
-                    self.black_king = xy_after
-                else:
-                    self.white_king = xy_after
-            self.board[xy_after[1]][xy_after[0]].xy = (xy_after[1], xy_after[0])
-            self.board[xy_before[1]][xy_before[0]] = ChessFigure('none', (-1, -1))
 
-            self.step += 1
-            self.current_color = 'w' if self.current_color == 'b' else 'b'
+        self.board[xy_before[1]][xy_before[0]].first_move = False
+        self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
 
-            return True
-        return False
+        if type(self.board[xy_after[1]][xy_after[0]]) == King:
+            if self.board[xy_after[1]][xy_after[0]].color == 'b':
+                self.black_king = xy_after
+            else:
+                self.white_king = xy_after
 
-    def check_click(self, pos, figure_color):
-        return False if pos[0] >= 8 else self.board[pos[1]][pos[0]].color == figure_color
+        self.board[xy_after[1]][xy_after[0]].xy = (xy_after[1], xy_after[0])
+        self.board[xy_before[1]][xy_before[0]] = ChessFigure('none', (-1, -1))
+
+        self.step += 1
+        self.current_color = self.get_enemy_color()
+
+    def pseudo_move(self, xy_before, xy_after):
+        deleted_figure = copy.copy(self.board[xy_after[1]][xy_after[0]])
+        self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
+
+        if type(self.board[xy_after[1]][xy_after[0]]) == King:
+            if self.board[xy_after[1]][xy_after[0]].color == 'b':
+                self.black_king = xy_after
+            else:
+                self.white_king = xy_after
+
+        self.board[xy_after[1]][xy_after[0]].xy = (xy_after[1], xy_after[0])
+        self.board[xy_before[1]][xy_before[0]] = ChessFigure('none', (-1, -1))
+        return deleted_figure
+
+    def pseudo_move_back(self, xy_before, xy_after, deleted_figure):
+        self.board[xy_before[1]][xy_before[0]] = self.board[xy_after[1]][xy_after[0]]
+        self.board[xy_before[1]][xy_before[0]].xy = (xy_before[1], xy_before[0])
+
+        if type(self.board[xy_before[1]][xy_before[0]]) == King:
+            if self.board[xy_before[1]][xy_before[0]].color == 'b':
+                self.black_king = xy_before
+            else:
+                self.white_king = xy_before
+
+        self.board[xy_after[1]][xy_after[0]] = deleted_figure
+
+
+
+    def check_click(self, pos, color):
+        return False if pos[0] >= 8 else self.board[pos[1]][pos[0]].color == color
 
     def is_king_check(self, color):
-        enemy_color = 'b' if color == 'w' else 'w'
+        enemy_color = self.get_enemy_color()
         pos = self.get_king_pos(color)
         enemy_steps = self.get_color_steps(enemy_color)
         if pos in set(enemy_steps):
@@ -342,7 +384,7 @@ class ChessBoard(object):
         moves = set()
         colored_items = self.get_color_items(color_name)
         if covering:
-            reverse_color = 'b' if color_name == 'w' else 'w'
+            reverse_color = self.get_enemy_color()
         else:
             reverse_color = color_name
 
@@ -355,9 +397,12 @@ class ChessBoard(object):
 
         return moves
 
+
     def get_current_color(self):
         return self.current_color
 
+    def get_enemy_color(self):
+        return 'b' if self.current_color == 'w' else 'w'
 
 
 class Game(object):
@@ -401,19 +446,23 @@ class Game(object):
                     running = False
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1 and self.playing_board.check_click(
-                            (event.pos[0] // 80, event.pos[1] // 80), self.playing_board.get_current_color()) and not is_screen_clicked:
+                    current_color = self.playing_board.get_current_color()
+                    converted_event_pos = (event.pos[0] // 80, event.pos[1] // 80)
+                    converted_last_pos = (last_click[0] // 80, last_click[1] // 80) if last_click is not None else None
+
+                    if event.button == 1 and self.playing_board.check_click(converted_event_pos, current_color) and\
+                            not is_screen_clicked:
                         self.draw(event.pos)
                         is_screen_clicked = True
                         last_click = event.pos
 
                     elif event.button == 1 and is_screen_clicked:
-                        if self.playing_board.check_click((event.pos[0] // 80, event.pos[1] // 80), self.playing_board.get_current_color()):
+                        if self.playing_board.check_click(converted_event_pos, current_color):
                             self.draw(event.pos)
                             last_click = event.pos
 
-                        elif self.playing_board.move((last_click[0] // 80, last_click[1] // 80),
-                                                     (event.pos[0] // 80, event.pos[1] // 80)):
+                        elif self.playing_board.check_move(converted_last_pos, converted_event_pos):
+                            self.playing_board.move(converted_last_pos, converted_event_pos)
                             self.draw()
                             is_screen_clicked = False
 
