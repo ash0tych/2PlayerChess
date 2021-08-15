@@ -20,7 +20,7 @@ class ChessFigure(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.color = color
         self.image = None
-        self.first_move = True
+        self.first_move = False
         self.xy = (xy[1], xy[0])
 
     def draw(self, screen_name):
@@ -114,6 +114,7 @@ class ChessFigure(pygame.sprite.Sprite):
 class Pawn(ChessFigure):
     def __init__(self, color, xy):
         ChessFigure.__init__(self, color, xy)
+        self.first_move = True
         if self.color == 'b':
             self.image = pygame.image.load(os.path.join(img_folder, 'bP.png'))
         else:
@@ -167,6 +168,7 @@ class Pawn(ChessFigure):
 class Rook(ChessFigure):
     def __init__(self, color, xy):
         ChessFigure.__init__(self, color, xy)
+        self.first_move = True
         if self.color == 'b':
             self.image = pygame.image.load(os.path.join(img_folder, 'bR.png'))
         else:
@@ -234,6 +236,8 @@ class Knight(ChessFigure):
 class King(ChessFigure):
     def __init__(self, color, xy):
         ChessFigure.__init__(self, color, xy)
+        self.first_move = True
+        self.was_checked = False
         if self.color == 'b':
             self.image = pygame.image.load(os.path.join(img_folder, 'bK.png'))
         else:
@@ -246,6 +250,15 @@ class King(ChessFigure):
                 if 0 <= i <= 7 and 0 <= j <= 7 and board[i][j].color != color:
                     moves.add((j, i))
         return moves
+
+    def can_be_castled(self, board):
+        right_rook = left_rook = False
+        if self.first_move and not self.was_checked:
+            y = 0 if self.color == 'b' else 7
+            left_rook = board[y][0].first_move
+            right_rook = board[y][7].first_move
+
+        return left_rook, right_rook
 
 
 class ChessBoard(object):
@@ -290,8 +303,12 @@ class ChessBoard(object):
             moves_before_deleting = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
 
         else:
-            moves_before_deleting = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color).difference(
-                self.get_color_steps('w' if self.board[xy[1]][xy[0]].color == 'b' else 'b', True))
+            king_moves = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
+            covering_enemy_moves = self.get_color_steps(self.get_enemy_color(),covering=True)
+            moves_before_deleting = king_moves.difference(covering_enemy_moves)
+
+            moves_before_deleting.update(self.get_castle_moves(xy))
+
 
         moves = self.delete_unreal_moves(moves_before_deleting, xy)
         return moves
@@ -308,7 +325,6 @@ class ChessBoard(object):
             self.pseudo_move_back(xy, move, deleted_figure)
 
         return moves_after_deleting
-
 
     def move(self, xy_before, xy_after):
 
@@ -353,8 +369,6 @@ class ChessBoard(object):
 
         self.board[xy_after[1]][xy_after[0]] = deleted_figure
 
-
-
     def check_click(self, pos, color):
         return False if pos[0] >= 8 else self.board[pos[1]][pos[0]].color == color
 
@@ -362,7 +376,8 @@ class ChessBoard(object):
         enemy_color = self.get_enemy_color()
         pos = self.get_king_pos(color)
         enemy_steps = self.get_color_steps(enemy_color)
-        if pos in set(enemy_steps):
+        if pos in enemy_steps:
+            self.board[pos[1]][pos[0]].was_checked = True
             return True
 
         return False
@@ -397,6 +412,19 @@ class ChessBoard(object):
 
         return moves
 
+    def get_castle_moves(self, xy):
+        castle_moves = set()
+        left, right = self.board[xy[1]][xy[0]].can_be_castled(self.board)
+        full_enemy_steps = self.get_color_steps(self.get_enemy_color())
+        if left and len(self.board[xy[1]][0].get_horizontal_move(self.board, self.get_enemy_color())) == 4:
+            if (2, xy[1]) not in full_enemy_steps and (3, xy[1]) not in full_enemy_steps:
+                castle_moves.add((2, xy[1]))
+
+        if right and len(self.board[xy[1]][7].get_horizontal_move(self.board, self.get_enemy_color())) == 3:
+            if (6, xy[1]) not in full_enemy_steps and (5, xy[1]) not in full_enemy_steps:
+                castle_moves.add((6, xy[1]))
+
+        return castle_moves
 
     def get_current_color(self):
         return self.current_color
