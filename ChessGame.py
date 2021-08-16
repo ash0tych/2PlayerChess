@@ -1,6 +1,8 @@
 import pygame
 import os
 import copy
+import sys
+
 
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'Assets')
@@ -23,8 +25,8 @@ class ChessFigure(pygame.sprite.Sprite):
         self.first_move = False
         self.xy = (xy[1], xy[0])
 
-    def draw(self, screen_name):
-        screen_name.blit(self.image, (self.xy[1] * 80, self.xy[0] * 80))
+    def get_image(self):
+        return self.image
 
     def get_vertical_move(self, board, color):
         moves = set()
@@ -304,17 +306,17 @@ class ChessBoard(object):
 
         else:
             king_moves = self.board[xy[1]][xy[0]].get_moves(self.board, self.board[xy[1]][xy[0]].color)
-            covering_enemy_moves = self.get_color_steps(self.get_enemy_color(),covering=True)
+            covering_enemy_moves = self.get_color_steps(self.get_enemy_color(), covering=True)
             moves_before_deleting = king_moves.difference(covering_enemy_moves)
 
-            moves_before_deleting.update(self.get_castle_moves(xy))
-
+            castle_moves = self.get_castle_moves(xy)
+            moves_before_deleting.update(castle_moves)
 
         moves = self.delete_unreal_moves(moves_before_deleting, xy)
         return moves
 
     def check_move(self, xy_before, xy_after):
-        return xy_after in set(self.get_moves(xy_before))
+        return xy_after in self.get_moves(xy_before)
 
     def delete_unreal_moves(self, moves, xy):
         moves_after_deleting = set()
@@ -322,26 +324,50 @@ class ChessBoard(object):
             deleted_figure = self.pseudo_move(xy, move)
             if not self.is_king_check(self.current_color):
                 moves_after_deleting.add(move)
+
             self.pseudo_move_back(xy, move, deleted_figure)
 
         return moves_after_deleting
 
     def move(self, xy_before, xy_after):
+        if type(self.board[xy_before[1]][xy_before[0]]) == King:
+            if self.is_castle_move(xy_after):
+                self.do_castle_move(xy_after)
 
-        self.board[xy_before[1]][xy_before[0]].first_move = False
-        self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
+            else:
+                self.do_normal_move(xy_before, xy_after)
 
-        if type(self.board[xy_after[1]][xy_after[0]]) == King:
-            if self.board[xy_after[1]][xy_after[0]].color == 'b':
+            if self.current_color == 'b':
                 self.black_king = xy_after
             else:
                 self.white_king = xy_after
 
+        else:
+            self.do_normal_move(xy_before, xy_after)
+
+    @staticmethod
+    def is_castle_move(xy):
+        return xy in {(2, 0), (6, 0), (2, 7), (6, 7)}
+
+    def do_castle_move(self, xy):
+        if xy[0] < 4:
+            rook_before = 0
+            rook_after = 3
+            king_after = 2
+        else:
+            rook_before = 7
+            rook_after = 5
+            king_after = 6
+
+        self.do_normal_move((rook_before, xy[1]), (rook_after, xy[1]))
+        self.do_normal_move((4, xy[1]), (king_after, xy[1]))
+
+    def do_normal_move(self, xy_before, xy_after):
+        self.board[xy_before[1]][xy_before[0]].first_move = False
+        self.board[xy_after[1]][xy_after[0]] = self.board[xy_before[1]][xy_before[0]]
+
         self.board[xy_after[1]][xy_after[0]].xy = (xy_after[1], xy_after[0])
         self.board[xy_before[1]][xy_before[0]] = ChessFigure('none', (-1, -1))
-
-        self.step += 1
-        self.current_color = self.get_enemy_color()
 
     def pseudo_move(self, xy_before, xy_after):
         deleted_figure = copy.copy(self.board[xy_after[1]][xy_after[0]])
@@ -377,7 +403,6 @@ class ChessBoard(object):
         pos = self.get_king_pos(color)
         enemy_steps = self.get_color_steps(enemy_color)
         if pos in enemy_steps:
-            self.board[pos[1]][pos[0]].was_checked = True
             return True
 
         return False
@@ -432,6 +457,16 @@ class ChessBoard(object):
     def get_enemy_color(self):
         return 'b' if self.current_color == 'w' else 'w'
 
+    def do_the_game_step(self, xy_before, xy_after):
+        self.move(xy_before, xy_after)
+
+        self.step += 1
+        self.current_color = self.get_enemy_color()
+
+        new_king_pos = self.get_king_pos(self.current_color)
+        if self.is_king_check(self.current_color):
+            self.board[new_king_pos[1]][new_king_pos[0]].was_checked = True
+
 
 class Game(object):
     def __init__(self, screen=None):
@@ -441,6 +476,7 @@ class Game(object):
         self.playing_board.figure_init()
         self.screen = screen if screen is not None else pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont('times', 40)
 
     def draw_board(self):
         for i in range(8):
@@ -458,7 +494,8 @@ class Game(object):
         black = self.playing_board.get_color_items('b')
         white = self.playing_board.get_color_items('w')
         for item in (black + white):
-            self.playing_board.board[item[0]][item[1]].draw(self.screen)
+            image = self.playing_board.board[item[0]][item[1]].get_image()
+            self.screen.blit(image, (item[1] * 80, item[0] * 80))
 
     def start(self):
         self.draw()
@@ -490,7 +527,7 @@ class Game(object):
                             last_click = event.pos
 
                         elif self.playing_board.check_move(converted_last_pos, converted_event_pos):
-                            self.playing_board.move(converted_last_pos, converted_event_pos)
+                            self.playing_board.do_the_game_step(converted_last_pos, converted_event_pos)
                             self.draw()
                             is_screen_clicked = False
 
@@ -508,6 +545,7 @@ class Game(object):
     def draw(self, event=None):
         self.draw_board()
         self.draw_figures()
+        self.draw_menu()
         if event is not None:
             self.draw_borders((event[0] // 80, event[1] // 80))
 
@@ -524,6 +562,12 @@ class Game(object):
         self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
         for pos_moves in moves:
             self.screen.blit(img, (pos_moves[0] * 80, pos_moves[1] * 80))
+
+    def draw_menu(self):
+        image = pygame.Surface((200, 640))
+        image.fill((255, 255, 255))
+        self.screen.blit(image, (640, 0))
+
 
 
 Game().start()
