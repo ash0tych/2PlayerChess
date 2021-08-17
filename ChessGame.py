@@ -12,9 +12,12 @@ WIDTH = 840
 HEIGHT = 640
 
 
-def chess_xy(string):
-    x_axis = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
-    return x_axis[string[0]], 8 - int(string[1])
+class Log_info(object):
+    def __init__(self, step, tuple_1, tuple_2, check):
+        self.step = step
+        self.first_figure_tuple = tuple_1
+        self.second_figure_tuple = tuple_2
+        self.check = check
 
 
 class ChessFigure(pygame.sprite.Sprite):
@@ -117,6 +120,7 @@ class Pawn(ChessFigure):
     def __init__(self, color, xy):
         ChessFigure.__init__(self, color, xy)
         self.first_move = True
+        self.can_take_on_asile = False
         if self.color == 'b':
             self.image = pygame.image.load(os.path.join(img_folder, 'bP.png'))
         else:
@@ -331,7 +335,7 @@ class ChessBoard(object):
 
     def move(self, xy_before, xy_after):
         if type(self.board[xy_before[1]][xy_before[0]]) == King:
-            if self.is_castle_move(xy_after):
+            if self.is_castle_move(xy_after) and self.board[xy_before[1]][xy_before[0]].can_be_castled(self.board):
                 self.do_castle_move(xy_after)
 
             else:
@@ -341,6 +345,10 @@ class ChessBoard(object):
                 self.black_king = xy_after
             else:
                 self.white_king = xy_after
+
+        elif type(self.board[xy_before[1]][xy_before[0]]) == Pawn and self.is_pawn_on_last(xy_after):
+            self.do_normal_move(xy_before, xy_after)
+            self.pawn_on_last(xy_after)
 
         else:
             self.do_normal_move(xy_before, xy_after)
@@ -407,6 +415,14 @@ class ChessBoard(object):
 
         return False
 
+    def is_king_checkmate(self, color):
+
+        return set() == self.get_full_real_steps() and self.is_king_check(color)
+
+    def is_king_stalemate(self, color):
+        return self.get_color_steps(color) == set() and not self.is_king_check(color)
+
+
     def get_king_pos(self, color):
         if color == 'w':
             return self.white_king
@@ -433,7 +449,15 @@ class ChessBoard(object):
                 buf_set = set(self.board[item[0]][item[1]].get_possible_pawn_diag_moves())
             else:
                 buf_set = set(self.board[item[0]][item[1]].get_moves(self.board, reverse_color))
+
             moves.update(buf_set)
+
+        return moves
+
+    def get_full_real_steps(self):
+        moves = set()
+        for item in self.get_color_items(self.get_current_color()):
+            moves.update(self.get_moves((item[1], item[0])))
 
         return moves
 
@@ -458,6 +482,9 @@ class ChessBoard(object):
         return 'b' if self.current_color == 'w' else 'w'
 
     def do_the_game_step(self, xy_before, xy_after):
+        tuple_1 = self.return_figure_info(xy_before)
+        tuple_2 = self.return_figure_info(xy_after)
+
         self.move(xy_before, xy_after)
 
         self.step += 1
@@ -466,6 +493,32 @@ class ChessBoard(object):
         new_king_pos = self.get_king_pos(self.current_color)
         if self.is_king_check(self.current_color):
             self.board[new_king_pos[1]][new_king_pos[0]].was_checked = True
+
+        if self.is_king_checkmate(self.get_current_color()):
+            king = 2
+        elif self.is_king_check(self.get_current_color()):
+            king = 1
+        elif self.is_king_stalemate(self.get_current_color()):
+            king = 3
+        else:
+            king = 0
+
+        return tuple_1, tuple_2, king
+
+
+
+    def is_pawn_on_last(self, xy):
+        return xy[1] == 0 or xy[1] == 7
+
+    def pawn_on_last(self, xy):
+        self.board[xy[1]][xy[0]] = Queen(self.get_current_color(), xy)
+
+    def return_figure_info(self, xy):
+        pos = xy
+        color = self.board[xy[1]][xy[0]].color
+        name = type(self.board[xy[1]][xy[0]])
+        image = copy.copy(self.board[xy[1]][xy[0]].image)
+        return (pos, color, name, image)
 
 
 class Game(object):
@@ -476,19 +529,16 @@ class Game(object):
         self.playing_board.figure_init()
         self.screen = screen if screen is not None else pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont('times', 40)
+        self.font = pygame.font.SysFont('segoe', 40)
+        self.menu_img = pygame.image.load(os.path.join(img_folder, 'menu.png'))
+        self.board_img = pygame.image.load(os.path.join(img_folder, 'chess_board.png'))
+        self.upper_border_img = pygame.image.load(os.path.join(img_folder, 'upper_border.png'))
+        self.lower_border_img = pygame.image.load(os.path.join(img_folder, 'lower_border.png'))
+        self.log = []
+
 
     def draw_board(self):
-        for i in range(8):
-            for j in range(8):
-                if (i + j) % 2 == 0:
-                    image = pygame.Surface((80, 80))
-                    image.fill(YELLOW)
-                    self.screen.blit(image, (i * 80, j * 80))
-                else:
-                    image = pygame.Surface((80, 80))
-                    image.fill(BROWN)
-                    self.screen.blit(image, (i * 80, j * 80))
+        self.screen.blit(self.board_img, (0, 0))
 
     def draw_figures(self):
         black = self.playing_board.get_color_items('b')
@@ -527,7 +577,8 @@ class Game(object):
                             last_click = event.pos
 
                         elif self.playing_board.check_move(converted_last_pos, converted_event_pos):
-                            self.playing_board.do_the_game_step(converted_last_pos, converted_event_pos)
+                            tuple_1, tuple_2, king = self.playing_board.do_the_game_step(converted_last_pos, converted_event_pos)
+                            self.save_log_info(tuple_1, tuple_2, king)
                             self.draw()
                             is_screen_clicked = False
 
@@ -546,12 +597,25 @@ class Game(object):
         self.draw_board()
         self.draw_figures()
         self.draw_menu()
+        self.show_current_color()
+        self.draw_log()
+
         if event is not None:
             self.draw_borders((event[0] // 80, event[1] // 80))
 
-        if self.playing_board.is_king_check(self.playing_board.get_current_color()):
+        if self.playing_board.is_king_checkmate(self.playing_board.get_current_color()):
+            pos = self.playing_board.get_king_pos(self.playing_board.get_current_color())
+            img = pygame.image.load(os.path.join(img_folder, 'checkmate_border.png'))
+            self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
+
+        elif self.playing_board.is_king_check(self.playing_board.get_current_color()):
             pos = self.playing_board.get_king_pos(self.playing_board.get_current_color())
             img = pygame.image.load(os.path.join(img_folder, 'check_border.png'))
+            self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
+
+        elif self.playing_board.is_king_stalemate(self.playing_board.get_current_color()):
+            pos = self.playing_board.get_king_pos(self.playing_board.get_current_color())
+            img = pygame.image.load(os.path.join(img_folder, 'stalemate_border.png'))
             self.screen.blit(img, (pos[0] * 80, pos[1] * 80))
 
         pygame.display.update()
@@ -564,10 +628,53 @@ class Game(object):
             self.screen.blit(img, (pos_moves[0] * 80, pos_moves[1] * 80))
 
     def draw_menu(self):
-        image = pygame.Surface((200, 640))
-        image.fill((255, 255, 255))
-        self.screen.blit(image, (640, 0))
+        self.screen.blit(self.menu_img, (640, 0))
+        
+    def show_current_color(self):
+        if self.playing_board.get_current_color() == 'b':
+            self.screen.blit(self.upper_border_img, (640, 0))
+        else:
+            self.screen.blit(self.lower_border_img, (640, 0))
 
+    def draw_log(self):
+        size = len(self.log)
+        if size <= 15:
+            for i in range(size):
+                self.draw_step(self.log[i].first_figure_tuple, self.log[i].second_figure_tuple, self.log[i].check, i)
+        else:
+            bias = size - 15
+            for i in range(bias, size):
+                self.draw_step(self.log[i].first_figure_tuple, self.log[i].second_figure_tuple, self.log[i].check, i - bias)
+
+
+    def draw_step(self, tuple_1, tuple_2, check, y):
+        pos1, _, _, image1 = tuple_1
+        pos2, _, _, image2 = tuple_2
+
+        self.screen.blit(pygame.transform.scale(image1, (30, 30)), (695, 90 + y * 30))
+        if image2 is not None:
+            self.screen.blit(pygame.transform.scale(image2, (30, 30)), (785, 90 + y * 30))
+
+        self.screen.blit(self.font.render(self.chess_xy(pos1), True, (0, 0, 0)), (665, 95 + y * 30))
+        self.screen.blit(self.font.render(self.chess_xy(pos2), True, (0, 0, 0)), (755, 95 + y * 30))
+
+        if check == 1:
+            img = pygame.image.load(os.path.join(img_folder, 'check_log.png'))
+            self.screen.blit(img, (660, 90 + y * 30))
+        elif check == 2:
+            img = pygame.image.load(os.path.join(img_folder, 'checkmate_log.png'))
+            self.screen.blit(img, (660, 90 + y * 30))
+        elif check == 3:
+            img = pygame.image.load(os.path.join(img_folder, 'stalemate_log.png'))
+            self.screen.blit(img, (660, 90 + y * 30))
+
+    def chess_xy(self, xy):
+        x_axis = {0: 'a', 1: 'b', 2: 'c', 3: 'd', 4: 'e', 5: 'f', 6: 'g', 7: 'h'}
+        return x_axis[xy[0]] + str(8 - xy[1])
+
+    def save_log_info(self, tuple_1, tuple_2, king):
+        log_component = Log_info(self.playing_board.step, tuple_1, tuple_2, king)
+        self.log.append(log_component)
 
 
 Game().start()
