@@ -9,6 +9,7 @@ img_folder = os.path.join(game_folder, 'Assets')
 WIDTH = 840
 HEIGHT = 640
 
+
 class Game(object):
     def __init__(self, screen=None):
         pygame.init()
@@ -75,6 +76,18 @@ class Game(object):
 
                     else:
                         self.draw()
+
+                if self.playing_board.check_for_current_check() >= 2:
+                    running = False
+
+        last_view = True
+        while last_view:
+            self.clock.tick(60)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    last_view = False
+
+                self.draw()
 
         pygame.quit()
 
@@ -166,8 +179,6 @@ class Game(object):
     def save_log_info(self, tuple_1, tuple_2, king):
         log_component = LogInfo(self.playing_board.step, tuple_1, tuple_2, king)
         self.log.append(log_component)
-
-
 
 
 Game().start()
