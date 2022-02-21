@@ -92,7 +92,7 @@ class Game(object):
         pygame.quit()
 
     def move(self, string_before, string_after):
-        self.playing_board.move(chess_xy(string_before), chess_xy(string_after))
+        self.playing_board.move(self.chess_xy(string_before), self.chess_xy(string_after))
 
     def draw(self, event=None):
         self.draw_board()
@@ -171,8 +171,8 @@ class Game(object):
             img = pygame.image.load(os.path.join(img_folder, 'stalemate_log.png'))
             self.screen.blit(img, (660, 90 + y * 30))
 
-    @staticmethod
-    def chess_xy(xy):
+    
+    def chess_xy(self, xy):
         x_axis = {0: 'a', 1: 'b', 2: 'c', 3: 'd', 4: 'e', 5: 'f', 6: 'g', 7: 'h'}
         return x_axis[xy[0]] + str(8 - xy[1])
 
