@@ -5,7 +5,7 @@ game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'Assets')
 
 
-class ChessFigure(pygame.sprite.Sprite):
+classes ChessFigure(pygame.sprite.Sprite):
     def __init__(self, color, xy):
         pygame.sprite.Sprite.__init__(self)
         self.color = color
